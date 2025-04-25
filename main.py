@@ -7,11 +7,11 @@ import asyncio
 
 
 @register(
-    "spectrecore_alpha",
-    "vege_testing",
+    "spectrecore",
+    "23q3",
     "使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验",
     "2.1.0",
-    "https://github.com/Vege_TB/AAAastrbot_plugin_SpectreCore"
+    "https://github.com/23q3/astrbot_plugin_SpectreCore"
 )
 
 class SpectreCore(Star):
