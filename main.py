@@ -1,26 +1,22 @@
 from astrbot.api.all import *
 from astrbot.api.event import filter
 from .utils import *
-import aiohttp
-import json
-import asyncio
-
 
 @register(
     "spectrecore",
-    "23q3",
+    "23q3", 
     "使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验",
     "2.1.1",
     "https://github.com/23q3/astrbot_plugin_SpectreCore"
 )
-
 class SpectreCore(Star):
+    """
+    使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验
+    """
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
-        self.model_handler = DualModelHandler(config)
-
-        # 初始化原有模块
+        # 初始化各个工具类
         HistoryStorage.init(config)
         ImageCaptionUtils.init(context, config)
 
@@ -28,6 +24,7 @@ class SpectreCore(Star):
     async def on_group_message(self, event: AstrMessageEvent):
         """处理群消息喵"""
         try:
+            # 保存用户消息到历史记录并尝试回复
             async for result in self._process_message(event):
                 yield result
         except Exception as e:
@@ -37,65 +34,27 @@ class SpectreCore(Star):
     async def on_private_message(self, event: AstrMessageEvent):
         """处理私聊消息喵"""
         try:
+            # 保存用户消息到历史记录并尝试回复
             async for result in self._process_message(event):
                 yield result
         except Exception as e:
             logger.error(f"处理私聊消息时发生错误: {e}")
-
+            
     async def _process_message(self, event: AstrMessageEvent):
         """处理消息的通用逻辑：保存历史记录并尝试回复"""
         # 保存用户消息到历史记录
         HistoryStorage.process_and_save_user_message(event)
-
-        # 尝试自动回复（传入当前配置）
+        
+        # 尝试自动回复
         if ReplyDecision.should_reply(event, self.config):
-            async for result in self._dual_model_process(event):
+            async for result in ReplyDecision.process_and_reply(event, self.config, self.context):
                 yield result
-
-    async def _dual_model_process(self, event):
-        """双模型协同处理流程"""
-        try:
-            raw_input = MessageUtils.clean_message(event.message_str)
-
-            # 并行调用双模型
-            v3_task = self.model_handler.call_v3(raw_input)
-            r1_task = self.model_handler.call_r1(f"分析对话上下文：{raw_input}")
-            v3_response, r1_analysis = await asyncio.gather(v3_task, r1_task)
-
-            # 生成增强型提示
-            enhanced_prompt = self._build_dual_prompt(
-                raw_input,
-                r1_analysis,
-                HistoryStorage.get_current_context(event)
-            )
-
-            # 获取最终响应
-            final_response = await self.model_handler.call_v3(enhanced_prompt)
-
-            # 保存上下文并返回结果
-            HistoryStorage.process_and_save_bot_message(final_response, event)
-            yield event.plain_result(final_response)
-
-        except Exception as e:
-            logger.error(f"双模型处理失败: {str(e)}")
-            yield event.plain_result("思考出现了一点小问题...")
-
-    def _build_dual_prompt(self, raw, analysis, context):
-        """构建双模型协作提示模板"""
-        return f"""
-        [对话上下文]
-        {context}
-
-        [当前消息] {raw}
-        [分析建议] {analysis}
-
-        请根据以上分析生成自然回复：
-        """
 
     @filter.after_message_sent()
     async def after_message_sent(self, event: AstrMessageEvent):
         """处理bot发送的消息喵"""
-        try:
+        try:           
+            # 保存机器人消息
             if event._result and hasattr(event._result, "chain"):
                 # 检查是否为重置历史记录的提示消息，如果是则不保存
                 message_text = "".join([i.text for i in event._result.chain if hasattr(i, "text")])
@@ -104,12 +63,13 @@ class SpectreCore(Star):
                 
                 HistoryStorage.save_bot_message_from_chain(event._result.chain, event)
                 logger.debug(f"已保存bot回复消息到历史记录")
+                
         except Exception as e:
             logger.error(f"处理bot发送的消息时发生错误: {e}")
 
     from astrbot.api.provider import LLMResponse
     @filter.on_llm_response()
-    async def on_llm_resp(self, event: AstrMessageEvent, resp: LLMResponse, priority=114514):
+    async def on_llm_resp(self, event: AstrMessageEvent, resp: LLMResponse , priority=114514): # 请注意有三个参数
         """处理大模型回复喵"""
         logger.debug(f"收到大模型回复喵: {resp}")
         try:
@@ -121,7 +81,7 @@ class SpectreCore(Star):
         except Exception as e:
             logger.error(f"处理大模型回复时发生错误: {e}")
 
-    @filter.command_group("spectrecore", alias={'sc'})
+    @filter.command_group("spectrecore",alias={'sc'})
     def spectrecore(self):
         """插件的前缀喵 可以用sc代替喵"""
         pass
@@ -143,135 +103,102 @@ class SpectreCore(Star):
     async def history(self, event: AstrMessageEvent, count: int = 10):
         """查看最近的聊天记录喵，默认10条喵，示例/sc history 5"""
         try:
+            # 获取平台名称
             platform_name = event.get_platform_name()
+            
+            # 判断是群聊还是私聊
             is_private = event.is_private_chat()
+            
+            # 获取聊天ID
             chat_id = event.get_group_id() if not is_private else event.get_sender_id()
-
+            
             if not chat_id:
                 yield event.plain_result("获取聊天ID失败喵，无法显示历史记录")
                 return
-
+                
+            # 获取历史记录
             history = HistoryStorage.get_history(platform_name, is_private, chat_id)
+            
             if not history:
                 yield event.plain_result("暂无聊天记录喵")
                 return
-
+                
+            # 限制记录数量
             if count > 20:
-                count = 20
-
+                count = 20  # 限制最大显示数量为20条
+            
+            # 只取最近的记录
             recent_history = history[-count:] if len(history) > count else history
+            
+            # 格式化历史记录 
             formatted_history = await MessageUtils.format_history_for_llm(recent_history)
-
+            
+            # 添加标题
             chat_type = "私聊" if is_private else f"群聊({chat_id})"
             title = f"最近{len(recent_history)}条{chat_type}聊天记录喵：\n\n"
+            
+            # 发送结果
             full_content = title + formatted_history
-
+            
+            # 如果内容过长，转为图片发送
             if len(full_content) > 3000:
                 image_url = await self.text_to_image(full_content)
                 yield event.image_result(image_url)
             else:
                 yield event.plain_result(full_content)
-
+            
         except Exception as e:
             logger.error(f"获取历史记录时发生错误: {e}")
             yield event.plain_result(f"获取历史记录失败喵：{str(e)}")
 
     @spectrecore.command("reset")
     async def reset(self, event: AstrMessageEvent, group_id: str = None):
-        """重置历史记录喵"""
+        """重置历史记录喵，不带参数重置当前聊天记录，带群号则重置指定群聊记录 如/sc reset 123456"""
         try:
+            # 获取平台名称
             platform_name = event.get_platform_name()
-
+            
+            # 判断是否提供了群号
             if group_id:
+                # 重置指定群聊的历史记录
                 is_private = False
                 chat_id = group_id
                 chat_type = f"群聊({group_id})"
             else:
+                # 判断是群聊还是私聊
                 is_private = event.is_private_chat()
+                # 获取聊天ID
                 chat_id = event.get_group_id() if not is_private else event.get_sender_id()
                 chat_type = "私聊" if is_private else f"群聊({chat_id})"
-
+                
                 if not chat_id:
                     yield event.plain_result("获取聊天ID失败喵，无法重置历史记录")
                     return
-
+            
+            # 先检查是否存在历史记录
             history = HistoryStorage.get_history(platform_name, is_private, chat_id)
             if not history:
                 yield event.plain_result(f"{chat_type}没有历史记录喵，无需重置")
                 return
-
+                
+            # 重置历史记录
             success = HistoryStorage.clear_history(platform_name, is_private, chat_id)
-
+            
             if success:
                 yield event.plain_result(f"已成功重置{chat_type}的历史记录喵~")
             else:
                 yield event.plain_result(f"重置{chat_type}的历史记录失败喵，可能发生错误")
-
+                
         except Exception as e:
             logger.error(f"重置历史记录时发生错误: {e}")
             yield event.plain_result(f"重置历史记录失败喵：{str(e)}")
 
     @spectrecore.command("callllm")
     async def callllm(self, event: AstrMessageEvent):
-        """触发大模型回复"""
+        """触发一次大模型回复 这是用来开发中测试的喵"""
         try:
+            # 调用LLM工具类的方法构建并返回请求
             yield await LLMUtils.call_llm(event, self.config, self.context)
         except Exception as e:
             logger.error(f"调用大模型时发生错误: {e}")
             yield event.plain_result(f"触发大模型回复失败喵：{str(e)}")
-
-
-class DualModelHandler:
-    """双模型处理器（保持不变）"""
-
-    def __init__(self, config):
-        self.v3_endpoint = config.get("deepseek.v3_endpoint")
-        self.r1_endpoint = config.get("deepseek.r1_endpoint")
-        self.api_key = config.get("deepseek.api_key")
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
-    async def call_v3(self, prompt, context=None):
-        payload = self._build_payload("v3", prompt, context)
-        return await self._call_api(self.v3_endpoint, payload)
-
-    async def call_r1(self, prompt):
-        payload = self._build_payload("r1", prompt)
-        return await self._call_api(self.r1_endpoint, payload)
-
-    def _build_payload(self, model_type, prompt, context=None):
-        base = {
-            "v3": {"temperature": 0.7, "max_tokens": 1024},
-            "r1": {"temperature": 0.5, "max_tokens": 256}
-        }[model_type]
-
-        messages = [{"role": "user", "content": prompt}]
-        if context:
-            messages = context + messages
-
-        return {"messages": messages, **base}
-
-    async def _call_api(self, endpoint, payload):
-        async with aiohttp.ClientSession() as session:
-            async with session.post(endpoint, headers=self.headers, json=payload) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
-                return data['choices'][0]['message']['content']
-
-
-class ReplyDecision:
-    """修正后的决策模块（无需初始化）"""
-
-    @classmethod
-    def should_reply(cls, event, config):
-        if not config.get("auto_reply"):
-            return False
-
-        # 强制回复条件
-        if event.is_at_bot():
-            return True
-
-        # 概率性回复
-        return random.random() < config.get("reply_probability", 0.3)
