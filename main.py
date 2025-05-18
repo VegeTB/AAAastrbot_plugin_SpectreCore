@@ -139,13 +139,15 @@ class SpectreCore(Star):
             
             # 发送结果
             full_content = title + formatted_history
-            
+
+            """
             # 如果内容过长，转为图片发送
             if len(full_content) > 3000:
                 image_url = await self.text_to_image(full_content)
                 yield event.image_result(image_url)
             else:
                 yield event.plain_result(full_content)
+            """
             
         except Exception as e:
             logger.error(f"获取历史记录时发生错误: {e}")
