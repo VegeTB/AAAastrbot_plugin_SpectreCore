@@ -4,7 +4,7 @@
 
 ![SpectreCore](https://avatars.githubusercontent.com/u/129108081?s=48&v=4)
 
-[![version](https://img.shields.io/badge/version-v2.1.1-blue.svg?style=flat-square)](https://github.com/23q3/astrbot_plugin_SpectreCore)
+[![version](https://img.shields.io/badge/version-v2.1.2-blue.svg?style=flat-square)](https://github.com/23q3/astrbot_plugin_SpectreCore)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
 [![author](https://img.shields.io/badge/author-23q3-orange.svg?style=flat-square)](https://github.com/23q3)
 
@@ -66,9 +66,8 @@ SpectreCore (影芯) 是一个为 AstrBot 设计的高级群聊互动插件，�
 
 ## 📋 最新版本
 
-### v2.1.1 (2025-04-29)
-- ✨ **新增黑名单关键词功能** - 添加黑名单关键词配置，可以设置不触发回复的关键词
-- 🐛 **修复重置历史记录问题** - 修复重置聊天记录后提示消息被错误保存到历史记录的问题 [#41](https://github.com/23q3/astrbot_plugin_SpectreCore/issues/41)
+### v2.1.2 (2025-06-02)
+- 🐛 **修复Reply消息处理错误** - 修复在处理包含回复消息的历史记录时出现'Reply' object has no attribute 'sender_str'错误的问题 [#46](https://github.com/23q3/astrbot_plugin_SpectreCore/issues/46)
 
 查看完整的[更新日志](./CHANGELOG.md)，了解项目的版本历史和功能变化。
 

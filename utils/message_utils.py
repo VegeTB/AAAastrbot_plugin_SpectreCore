@@ -170,8 +170,9 @@ class MessageUtils:
                 elif i.message_str:
                     sender_info = f"{i.sender_nickname}({i.sender_id})" if i.sender_nickname else f"{i.sender_id}"
                     outline += f"[回复({sender_info}: {i.message_str})]"
-                elif i.sender_str:
-                    outline += f"[回复({i.sender_str})]" 
+                elif i.sender_nickname or i.sender_id:
+                    sender_info = f"{i.sender_nickname}({i.sender_id})" if i.sender_nickname else f"{i.sender_id}"
+                    outline += f"[回复({sender_info})]"
                 else:
                     outline += "[回复消息]"
             else:
